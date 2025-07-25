@@ -1,217 +1,828 @@
-{
-  "openapi": "3.1.0",
-  "info": {
-    "title": "OpenAPI Plant Store",
-    "description": "A sample API that uses a plant store as an example to demonstrate features in the OpenAPI specification",
-    "license": {
-      "name": "MIT"
-    },
-    "version": "1.0.0"
-  },
-  "servers": [
-    {
-      "url": "http://sandbox.mintlify.com"
-    }
-  ],
-  "security": [
-    {
-      "bearerAuth": []
-    }
-  ],
-  "paths": {
-    "/plants": {
-      "get": {
-        "description": "Returns all plants from the system that the user has access to",
-        "parameters": [
-          {
-            "name": "limit",
-            "in": "query",
-            "description": "The maximum number of results to return",
-            "schema": {
-              "type": "integer",
-              "format": "int32"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Plant response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/Plant"
-                  }
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Unexpected error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          }
-        }
-      },
-      "post": {
-        "description": "Creates a new plant in the store",
-        "requestBody": {
-          "description": "Plant to add to the store",
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/NewPlant"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "description": "plant response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Plant"
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "unexpected error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/plants/{id}": {
-      "delete": {
-        "description": "Deletes a single plant based on the ID supplied",
-        "parameters": [
-          {
-            "name": "id",
-            "in": "path",
-            "description": "ID of plant to delete",
-            "required": true,
-            "schema": {
-              "type": "integer",
-              "format": "int64"
-            }
-          }
-        ],
-        "responses": {
-          "204": {
-            "description": "Plant deleted",
-            "content": {}
-          },
-          "400": {
-            "description": "unexpected error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          }
-        }
-      }
-    }
-  },
-  "webhooks": {
-    "/plant/webhook": {
-      "post": {
-        "description": "Information about a new plant added to the store",
-        "requestBody": {
-          "description": "Plant added to the store",
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/NewPlant"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "Return a 200 status to indicate that the data was received successfully"
-          }
-        }
-      }
-    }
-  },
-  "components": {
-    "schemas": {
-      "Plant": {
-        "required": [
-          "name"
-        ],
-        "type": "object",
-        "properties": {
-          "name": {
-            "description": "The name of the plant",
-            "type": "string"
-          },
-          "tag": {
-            "description": "Tag to specify the type",
-            "type": "string"
-          }
-        }
-      },
-      "NewPlant": {
-        "allOf": [
-          {
-            "$ref": "#/components/schemas/Plant"
-          },
-          {
-            "required": [
-              "id"
-            ],
-            "type": "object",
-            "properties": {
-              "id": {
-                "description": "Identification number of the plant",
-                "type": "integer",
-                "format": "int64"
-              }
-            }
-          }
-        ]
-      },
-      "Error": {
-        "required": [
-          "error",
-          "message"
-        ],
-        "type": "object",
-        "properties": {
-          "error": {
-            "type": "integer",
-            "format": "int32"
-          },
-          "message": {
-            "type": "string"
-          }
-        }
-      }
-    },
-    "securitySchemes": {
-      "bearerAuth": {
-        "type": "http",
-        "scheme": "bearer"
-      }
-    }
-  }
-}
+openapi: 3.0.1
+info:
+  title: Fathom External API
+  version: "1.0.0"
+  description: |
+    The Fathom External API lets you poll meetings, teams, and team members, and
+    optionally receive webhooks when content from a new meeting is ready.
+
+servers:
+  - url: https://api.fathom.ai/external/v1
+
+security:
+  - ApiKeyAuth: []
+  - OAuth2: []
+
+paths:
+  /meetings:
+    get:
+      security:
+        - OAuth2:
+            - 'public_api_read'
+      tags:
+        - Meetings
+      x-fern-pagination:
+        cursor: $request.cursor
+        next_cursor: $response.next_cursor
+        results: $response.items
+      summary: List meetings
+      operationId: listMeetings
+      parameters:
+        - in: query
+          name: calendar_invitees[]
+          description: |
+            Email address of calendar_invitees to filter by.
+
+            Pass the parameter once per value, e.g.
+            `calendar_invitees[]=cfo@acme.com&calendar_invitees[]=legal@acme.com`.
+
+            Returns meetings where any of the given email addresses appear
+            in the calendar_invitees list.
+          schema:
+            type: array
+            items:
+              type: string
+              format: email
+            example: ["cfo@acme.com", "legal@acme.com"]
+          style: form
+          explode: true
+        - in: query
+          name: calendar_invitees_domains[]
+          description: |
+            Domains of the companies to filter by. Exact match.
+
+            Pass the parameter once per value, e.g.
+            `calendar_invitees_domains[]=acme.com&calendar_invitees_domains[]=client.com`.
+
+            Returns meetings where any of the given company domains appear in the meeting.
+          schema:
+            type: array
+            items:
+              type: string
+            example: ["acme.com", "client.com"]
+          style: form
+          explode: true
+        - in: query
+          name: created_after
+          description: Filter to meetings with created_at after this timestamp, e.g. `created_after=2025-01-01T00:00:00Z`.
+          schema:
+            type: string
+        - in: query
+          name: created_before
+          description: Filter to meetings with created_at before this timestamp, e.g. `created_before=2025-01-01T00:00:00Z`.
+          schema:
+            type: string
+        - in: query
+          name: cursor
+          description: Cursor for pagination.
+          schema:
+            type: string
+        - in: query
+          name: include_crm_matches
+          description: Include CRM matches for each meeting. Only returns data from your or your team's linked CRM.
+          schema:
+            type: boolean
+            default: false
+        - in: query
+          name: include_transcript
+          description: Include the transcript for each meeting.
+          schema:
+            type: boolean
+            default: false
+        - in: query
+          name: meeting_type
+          description: Filter by meeting type.
+          schema:
+            type: string
+            enum: [all, internal, external]
+            default: all
+        - in: query
+          name: recorded_by[]
+          description: |
+            Email addresses of meeting owners.
+
+            Pass the parameter once per value, e.g.
+            `recorded_by[]=ceo@acme.com&recorded_by[]=pm@acme.com`.
+
+            Returns meetings hosted by any of the specified users.
+          schema:
+            type: array
+            items:
+              type: string
+              format: email
+            example: ["ceo@acme.com", "pm@acme.com"]
+          style: form
+          explode: true
+        - in: query
+          name: teams[]
+          description: |
+            Team names to filter by.
+
+            Pass the parameter once per value, e.g.
+            `teams[]=Sales&teams[]=Engineering`.
+
+            Returns meetings that belong to any of the specified teams.
+          schema:
+            type: array
+            items:
+              type: string
+            example: ["Sales", "Engineering"]
+          style: form
+          explode: true
+      responses:
+        "200":
+          description: Paginated list of meetings.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MeetingListResponse'
+        "400":
+          $ref: '#/components/responses/BadRequest'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "429":
+          $ref: '#/components/responses/RateLimited'
+
+  /teams:
+    get:
+      tags:
+        - Teams
+      x-fern-pagination:
+        cursor: $request.cursor
+        next_cursor: $response.next_cursor
+        results: $response.items
+      summary: List teams
+      operationId: listTeams
+      parameters:
+        - in: query
+          name: cursor
+          description: Cursor for pagination.
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Paginated list of teams.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TeamListResponse'
+        "400":
+          $ref: '#/components/responses/BadRequest'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "429":
+          $ref: '#/components/responses/RateLimited'
+
+  /team_members:
+    get:
+      tags:
+        - Team Members
+      x-fern-pagination:
+        cursor: $request.cursor
+        next_cursor: $response.next_cursor
+        results: $response.items
+      summary: List team members
+      operationId: listTeamMembers
+      parameters:
+        - in: query
+          name: cursor
+          description: Cursor for pagination.
+          schema:
+            type: string
+        - in: query
+          name: team
+          description: Team name to filter by.
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Paginated list of team members.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TeamMemberListResponse'
+        "400":
+          $ref: '#/components/responses/BadRequest'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "429":
+          $ref: '#/components/responses/RateLimited'
+
+  /webhooks:
+    post:
+      tags:
+        - Webhooks
+      operationId: createWebhook
+      summary: Create a webhook
+      description: |
+        Create a webhook to receive new meeting content.
+        At least one of `include_transcript`, `include_crm_matches`, `include_summary`, or `include_action_items` must be true.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [destination_url]
+              additionalProperties: false
+              properties:
+                destination_url:
+                  type: string
+                  description: The URL to send the webhook to.
+                  format: uri
+                  example: "https://example.com/webhook"
+                include_action_items:
+                  type: boolean
+                  description: Include the action items for each meeting.
+                  default: false
+                  example: true
+                include_crm_matches:
+                  type: boolean
+                  description: Include CRM matches for each meeting. Only returns data from your or your team's linked CRM.
+                  default: false
+                  example: true
+                include_summary:
+                  type: boolean
+                  description: Include the summary for each meeting.
+                  default: false
+                  example: true
+                include_transcript:
+                  type: boolean
+                  description: Include the transcript for each meeting.
+                  default: false
+                  example: true
+      responses:
+        "201":
+          description: The created webhook.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Webhook'
+        "400":
+          $ref: '#/components/responses/BadRequest'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "429":
+          $ref: '#/components/responses/RateLimited'
+
+  /webhooks/{id}:
+    delete:
+      tags:
+        - Webhooks
+      operationId: deleteWebhook
+      summary: Delete a webhook
+      description: Delete a webhook.
+      parameters:
+        - in: path
+          name: id
+          required: true
+          description: The ID of the webhook to delete.
+          schema:
+            type: string
+      responses:
+        "204":
+          description: The webhook was deleted successfully.
+        "400":
+          $ref: '#/components/responses/BadRequest'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "404":
+          $ref: '#/components/responses/NotFound'
+        "429":
+          $ref: '#/components/responses/RateLimited'
+
+  /oauth2/authorize:
+    get:
+      summary: Authorization endpoint for obtaining an authorization code
+      description: >
+        Redirect the user-agent to this endpoint to obtain an authorization code.
+      parameters:
+        - name: response_type
+          in: query
+          required: true
+          schema:
+            type: string
+            enum: [code]
+        - name: client_id
+          in: query
+          required: true
+          schema:
+            type: string
+        - name: redirect_uri
+          in: query
+          required: false
+          schema:
+            type: string
+            format: uri
+        - name: scope
+          in: query
+          required: false
+          schema:
+            type: string
+            description: space-delimited list of scopes
+        - name: state
+          in: query
+          required: false
+          schema:
+            type: string
+            description: opaque value to maintain state between request and callback
+      responses:
+        '302':
+          description: Redirect to the client's `redirect_uri` with `code` and `state`
+        '400':
+          description: Invalid request parameters
+  /oauth2/token:
+    post:
+      operationId: getToken
+      security:
+        - tokenRequest: []
+      tags:
+        - OAuth2
+      summary: Token endpoint for exchanging an authorization code or refreshing an access token
+      requestBody:
+        required: true
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              properties:
+                grant_type:
+                  type: string
+                  enum: [authorization_code, refresh_token]
+                code:
+                  type: string
+                  description: authorization code received from `/authorize`
+                redirect_uri:
+                  type: string
+                  format: uri
+                  description: must match the redirect URI used in `/authorize`
+                client_id:
+                  type: string
+                client_secret:
+                  type: string
+                refresh_token:
+                  type: string
+                  description: refresh token issued previously
+              required: [code, grant_type, client_id, client_secret, redirect_uri]
+      responses:
+        '200':
+          description: Access token (and optionally refresh token) response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  access_token:
+                    type: string
+                  token_type:
+                    type: string
+                    example: Bearer
+                  expires_in:
+                    type: integer
+                    description: seconds until expiration
+                  refresh_token:
+                    type: string
+                  scope:
+                    type: string
+                required:
+                  - access_token
+                  - refresh_token
+                  # - token_type
+                  - expires_in
+        '400':
+          description: Invalid grant or request
+
+
+components:
+  securitySchemes:
+    ApiKeyAuth:
+      type: apiKey
+      in: header
+      name: X-Api-Key
+      description: >
+        Include your API key in the `X-Api-Key` header of every request.
+      x-fern-bearer:
+        name: apiKey
+        env: FATHOM_API_KEY
+    tokenRequest:
+      type: http
+      scheme: custom
+      description: >
+        Coming soon: use OAuth2 to authorize access to the API.
+      x-speakeasy-custom-security-scheme:
+        schema:
+          properties:
+            grant_type:
+              type: string
+              enum: [authorization_code, refresh_token]
+            client_id:
+              type: string
+              example: app-speakeasy-123
+            client_secret:
+              type: string
+              example: MTIzNDU2Nzg5MDEyMzQ1Njc4OTAxMjM0NTY3ODkwMTI
+            redirect_uri:
+              type: string
+              format: uri
+              example: https://example.com/callback
+            code:
+              type: string
+              example: abcdef1234567890
+          required: [client_id, client_secret, redirect_uri, code]
+
+  responses:
+    BadRequest:
+      description: Bad request - the query parameters were invalid.
+    Unauthorized:
+      description: Unauthorized - missing or invalid `Authorization` header.
+    NotFound:
+      description: Not found - the resource was not found.
+    RateLimited:
+      description: Rate limited - you have exceeded the rate limit for the requested endpoint. Check our [rate limiting](/api-reference#rate-limiting) documentation for more information.
+
+  schemas:
+    Webhook:
+      type: object
+      required: [id, url, secret, created_at, include_transcript, include_crm_matches, include_summary, include_action_items]
+      properties:
+        id:
+          type: string
+          example: "ikEoQ4bVoq4JYUmc"
+        url:
+          type: string
+          format: uri
+          example: "https://example.com/webhook"
+        secret:
+          type: string
+          description: The secret used to verify the webhook signature.
+          example: "whsec_x6EV6NIAAz3ldclszNJTwrow"
+        created_at:
+          type: string
+          description: The date and time the webhook was created in ISO 8601 format.
+          format: date-time
+          example: "2025-06-30T10:40:46Z"
+        include_transcript:
+          type: boolean
+          example: true
+        include_crm_matches:
+          type: boolean
+          example: true
+        include_summary:
+          type: boolean
+          example: true
+        include_action_items:
+          type: boolean
+          example: true
+
+    MeetingListResponse:
+      type: object
+      required: [limit, next_cursor, items]
+      properties:
+        limit:
+          type: integer
+          nullable: true
+          example: 1
+        next_cursor:
+          type: string
+          nullable: true
+          example: "eyJwYWdlX251bSI6Mn0="
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/Meeting'
+
+    TeamListResponse:
+      type: object
+      required: [limit, next_cursor, items]
+      properties:
+        limit:
+          type: integer
+        next_cursor:
+          type: string
+          nullable: true
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/Team'
+
+    TeamMemberListResponse:
+      type: object
+      required: [limit, next_cursor, items]
+      properties:
+        limit:
+          type: integer
+        next_cursor:
+          type: string
+          nullable: true
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/TeamMember'
+
+    Meeting:
+      type: object
+      required:
+        - title
+        - meeting_title
+        - url
+        - share_url
+        - created_at
+        - scheduled_start_time
+        - scheduled_end_time
+        - recording_start_time
+        - recording_end_time
+        - meeting_type
+        - recorded_by
+        - transcript_language
+        - calendar_invitees
+      properties:
+        title:
+          type: string
+          example: "Quarterly Business Review"
+        meeting_title:
+          type: string
+          example: "QBR 2025 Q1"
+          description: Calendar event title.
+        url:
+          type: string
+          format: uri
+          example: "https://fathom.video/xyz123"
+        share_url:
+          type: string
+          format: uri
+          example: "https://fathom.video/share/xyz123"
+        created_at:
+          type: string
+          format: date-time
+          example: "2025-03-01T17:01:30Z"
+        scheduled_start_time:
+          type: string
+          format: date-time
+          example: "2025-03-01T16:00:00Z"
+        scheduled_end_time:
+          type: string
+          format: date-time
+          example: "2025-03-01T17:00:00Z"
+        recording_start_time:
+          type: string
+          format: date-time
+          example: "2025-03-01T16:01:12Z"
+        recording_end_time:
+          type: string
+          format: date-time
+          example: "2025-03-01T17:00:55Z"
+        meeting_type:
+          type: string
+          enum: [internal, external]
+          example: external
+        transcript_language:
+          type: string
+          example: "en"
+        transcript:
+          type: array
+          items:
+            $ref: '#/components/schemas/TranscriptItem'
+          nullable: true
+        default_summary:
+          $ref: '#/components/schemas/MeetingSummary'
+          nullable: true
+        action_items:
+          type: array
+          items:
+            $ref: '#/components/schemas/ActionItem'
+          nullable: true
+        calendar_invitees:
+          type: array
+          items:
+            $ref: '#/components/schemas/Invitee'
+        recorded_by:
+          $ref: '#/components/schemas/FathomUser'
+        crm_matches:
+          $ref: '#/components/schemas/CRMMatches'
+          nullable: true
+
+    CRMMatches:
+      type: object
+      description: |
+        CRM data linked to the meeting. Only returns data from your or your team's linked CRM.
+        If no CRM is connected for the workspace, the `error` field will be populated.
+      properties:
+        contacts:
+          type: array
+          items:
+            $ref: '#/components/schemas/CRMContactMatch'
+        companies:
+          type: array
+          items:
+            $ref: '#/components/schemas/CRMCompanyMatch'
+        deals:
+          type: array
+          items:
+            $ref: '#/components/schemas/CRMDealMatch'
+        error:
+          type: string
+          example: "no CRM connected"
+
+    CRMContactMatch:
+      type: object
+      required: [name, email, record_url]
+      properties:
+        name:
+          type: string
+          example: "Jane Smith"
+        email:
+          type: string
+          format: email
+          example: "jane.smith@client.com"
+        record_url:
+          type: string
+          format: uri
+          example: "https://app.hubspot.com/contacts/123"
+
+    CRMCompanyMatch:
+      type: object
+      required: [name, record_url]
+      properties:
+        name:
+          type: string
+          example: "Acme Corp"
+        record_url:
+          type: string
+          format: uri
+          example: "https://app.hubspot.com/companies/456"
+
+    CRMDealMatch:
+      type: object
+      required: [name, amount, record_url]
+      properties:
+        name:
+          type: string
+          example: "Q1 Renewal"
+        amount:
+          type: number
+          description: The amount in dollars.
+          example: 50000.00
+        record_url:
+          type: string
+          format: uri
+          example: "https://app.hubspot.com/deals/789"
+
+    MeetingSummary:
+      type: object
+      required: [template_name, markdown_formatted]
+      properties:
+        template_name:
+          type: string
+          example: "general"
+          nullable: true
+        markdown_formatted:
+          type: string
+          example: |
+            ## Summary
+            We reviewed Q1 OKRs, identified budget risks, and agreed to revisit projections next month.
+          description: Always displayed in English.
+          nullable: true
+
+    ActionItem:
+      type: object
+      required:
+        - description
+        - user_generated
+        - completed
+        - recording_timestamp
+        - recording_playback_url
+        - assignee
+      properties:
+        description:
+          type: string
+          example: "Email revised proposal to client"
+          description: Always displayed in English.
+        user_generated:
+          type: boolean
+          example: false
+        completed:
+          type: boolean
+          example: false
+        recording_timestamp:
+          type: string
+          pattern: '^\d{2}:\d{2}:\d{2}$'
+          description: Timestamp relative to the start of the recording (HH:MM:SS).
+          example: "00:10:45"
+        recording_playback_url:
+          type: string
+          format: uri
+          example: "https://fathom.video/xyz123#t=645"
+        assignee:
+          $ref: '#/components/schemas/Assignee'
+
+    Assignee:
+      type: object
+      required: [name, email, team]
+      properties:
+        name:
+          type: string
+          example: "Alice Johnson"
+          nullable: true
+        email:
+          type: string
+          format: email
+          example: "alice.johnson@acme.com"
+          nullable: true
+        team:
+          type: string
+          example: "Marketing"
+          nullable: true
+
+    TranscriptItem:
+      type: object
+      required: [speaker, text, timestamp]
+      properties:
+        speaker:
+          $ref: '#/components/schemas/TranscriptItemSpeaker'
+        text:
+          type: string
+          example: "Let's revisit the budget allocations."
+        timestamp:
+          type: string
+          pattern: '^\d{2}:\d{2}:\d{2}$'
+          description: Timestamp relative to the start of the meeting (HH:MM:SS).
+          example: "00:05:32"
+
+    TranscriptItemSpeaker:
+      type: object
+      required: [display_name]
+      properties:
+        display_name:
+          type: string
+          example: "Alice Johnson"
+        matched_calendar_invitee_email:
+          type: string
+          format: email
+          example: "alice.johnson@acme.com"
+
+    Invitee:
+      type: object
+      required: [name, email, is_external]
+      properties:
+        name:
+          type: string
+          example: "Alice Johnson"
+          nullable: true
+        matched_speaker_display_name:
+          type: string
+          description: |
+            **Coming soon!**
+          example: "Alice Johnson"
+          nullable: true
+        email:
+          type: string
+          format: email
+          example: "alice.johnson@acme.com"
+          nullable: true
+        is_external:
+          type: boolean
+          example: false
+
+    FathomUser:
+      type: object
+      required: [name, email, team]
+      properties:
+        name:
+          type: string
+          example: "Alice Johnson"
+        email:
+          type: string
+          format: email
+          example: "alice.johnson@acme.com"
+        team:
+          type: string
+          example: "Marketing"
+          nullable: true
+
+    Team:
+      type: object
+      required: [name, created_at]
+      properties:
+        name:
+          type: string
+          example: "Sales"
+        created_at:
+          type: string
+          format: date-time
+          example: "2023-11-10T12:00:00Z"
+
+    TeamMember:
+      type: object
+      required: [name, email, created_at]
+      properties:
+        name:
+          type: string
+          example: "Bob Lee"
+        email:
+          type: string
+          format: email
+          example: "bob.lee@acme.com"
+        created_at:
+          type: string
+          format: date-time
+          example: "2024-06-01T08:30:00Z"
