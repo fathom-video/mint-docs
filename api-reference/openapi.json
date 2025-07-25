@@ -1,4 +1,4 @@
-openapi: 3.0.1
+openapi: 3.1.1
 info:
   title: Fathom External API
   version: "1.0.0"
@@ -11,14 +11,10 @@ servers:
 
 security:
   - ApiKeyAuth: []
-  - OAuth2: []
 
 paths:
   /meetings:
     get:
-      security:
-        - OAuth2:
-            - 'public_api_read'
       tags:
         - Meetings
       x-fern-pagination:
@@ -291,107 +287,117 @@ paths:
         "429":
           $ref: '#/components/responses/RateLimited'
 
-  /oauth2/authorize:
-    get:
-      summary: Authorization endpoint for obtaining an authorization code
-      description: >
-        Redirect the user-agent to this endpoint to obtain an authorization code.
-      parameters:
-        - name: response_type
-          in: query
-          required: true
-          schema:
-            type: string
-            enum: [code]
-        - name: client_id
-          in: query
-          required: true
-          schema:
-            type: string
-        - name: redirect_uri
-          in: query
-          required: false
-          schema:
-            type: string
-            format: uri
-        - name: scope
-          in: query
-          required: false
-          schema:
-            type: string
-            description: space-delimited list of scopes
-        - name: state
-          in: query
-          required: false
-          schema:
-            type: string
-            description: opaque value to maintain state between request and callback
-      responses:
-        '302':
-          description: Redirect to the client's `redirect_uri` with `code` and `state`
-        '400':
-          description: Invalid request parameters
-  /oauth2/token:
+webhooks:
+  newMeeting:
     post:
-      operationId: getToken
-      security:
-        - tokenRequest: []
       tags:
-        - OAuth2
-      summary: Token endpoint for exchanging an authorization code or refreshing an access token
+        - Webhook Payloads
+      operationId: newMeeting
+      summary: New meeting content ready
+      description: Webhook sent to the URL you register in Fathom settings.
+      parameters:
+        - name: webhook-id
+          in: header
+          description: >-
+            Unique message identifier for the webhook message. This identifier
+            is unique across all messages, but will be the same when the same
+            webhook is being resent (e.g. due to a previous failure).
+          required: true
+          schema:
+            type: string
+            example: "msg_2x2zwLOcWaRTzsLK8KtbQt1FTk9"
+        - name: webhook-timestamp
+          in: header
+          description: Timestamp in seconds since epoch.
+          required: true
+          schema:
+            type: integer
+            example: 1712345678
+        - name: webhook-signature
+          in: header
+          description: >-
+            Signature with version prefix and base64-encoded value. Format is
+            `<version>,<base64_signature>`. Multiple signatures may be space-delimited
+            (e.g. `v1,RmF0aG9t v2,QVBJ`).
+          required: true
+          schema:
+            type: string
+            example: "v1,BKQR1BIFjiNPdfpqM3+FH/YckKhX7WIq4/KK6Cc5aDY="
       requestBody:
         required: true
         content:
-          application/x-www-form-urlencoded:
+          application/json:
             schema:
-              type: object
-              properties:
-                grant_type:
-                  type: string
-                  enum: [authorization_code, refresh_token]
-                code:
-                  type: string
-                  description: authorization code received from `/authorize`
-                redirect_uri:
-                  type: string
-                  format: uri
-                  description: must match the redirect URI used in `/authorize`
-                client_id:
-                  type: string
-                client_secret:
-                  type: string
-                refresh_token:
-                  type: string
-                  description: refresh token issued previously
-              required: [code, grant_type, client_id, client_secret, redirect_uri]
+              $ref: '#/components/schemas/Meeting'
+            example:
+              title: "Quarterly Business Review"
+              meeting_title: "QBR 2025 Q1"
+              url: "https://fathom.video/xyz123"
+              share_url: "https://fathom.video/share/xyz123"
+              created_at: "2025-03-01T17:01:30Z"
+              scheduled_start_time: "2025-03-01T16:00:00Z"
+              scheduled_end_time: "2025-03-01T17:00:00Z"
+              recording_start_time: "2025-03-01T16:01:12Z"
+              recording_end_time: "2025-03-01T17:00:55Z"
+              meeting_type: external
+              transcript:
+                - speaker:
+                    display_name: "Jane Doe"
+                    matched_calendar_invitee_email: "jane.doe@acme.com"
+                  text: "Let's revisit the budget allocations."
+                  timestamp: "00:05:32"
+                - speaker:
+                    display_name: "John Smith"
+                    matched_calendar_invitee_email: "john.smith@client.com"
+                  text: "I agree, we need to adjust our projections."
+                  timestamp: "00:05:40"
+              default_summary:
+                template_name: "general"
+                markdown_formatted: |
+                  ## Summary
+                  We reviewed Q1 OKRs, identified budget risks, and agreed to revisit projections next month.
+              action_items:
+                - description: "Email revised proposal to client"
+                  user_generated: false
+                  completed: false
+                  recording_timestamp: "00:10:45"
+                  recording_playback_url: "https://fathom.video/xyz123#t=645"
+                  assignee:
+                    name: "Jane Doe"
+                    email: "jane.doe@acme.com"
+                    team: "Marketing"
+              calendar_invitees:
+                - name: "Alice Johnson"
+                  matched_speaker_display_name: "Alice Johnson"
+                  email: "alice.johnson@acme.com"
+                  is_external: false
+                - name: "Jane Doe"
+                  matched_speaker_display_name: "Jane Doe"
+                  email: "jane.doe@acme.com"
+                  is_external: false
+                - name: "John Smith"
+                  matched_speaker_display_name: "John Smith"
+                  email: "john.smith@client.com"
+                  is_external: true
+              recorded_by:
+                name: "Alice Johnson"
+                email: "alice.johnson@acme.com"
+                team: "Customer Success"
+              crm_matches:
+                contacts:
+                  - name: "John Smith"
+                    email: "john.smith@client.com"
+                    record_url: "https://app.hubspot.com/contacts/123"
+                companies:
+                  - name: "Acme Corp"
+                    record_url: "https://app.hubspot.com/companies/456"
+                deals:
+                  - name: "Q1 Renewal"
+                    amount: 50000
+                    record_url: "https://app.hubspot.com/deals/789"
       responses:
-        '200':
-          description: Access token (and optionally refresh token) response
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  access_token:
-                    type: string
-                  token_type:
-                    type: string
-                    example: Bearer
-                  expires_in:
-                    type: integer
-                    description: seconds until expiration
-                  refresh_token:
-                    type: string
-                  scope:
-                    type: string
-                required:
-                  - access_token
-                  - refresh_token
-                  # - token_type
-                  - expires_in
-        '400':
-          description: Invalid grant or request
-
+        "200":
+          description: Return any 2xx code to acknowledge receipt.
 
 components:
   securitySchemes:
@@ -404,31 +410,6 @@ components:
       x-fern-bearer:
         name: apiKey
         env: FATHOM_API_KEY
-    tokenRequest:
-      type: http
-      scheme: custom
-      description: >
-        Coming soon: use OAuth2 to authorize access to the API.
-      x-speakeasy-custom-security-scheme:
-        schema:
-          properties:
-            grant_type:
-              type: string
-              enum: [authorization_code, refresh_token]
-            client_id:
-              type: string
-              example: app-speakeasy-123
-            client_secret:
-              type: string
-              example: MTIzNDU2Nzg5MDEyMzQ1Njc4OTAxMjM0NTY3ODkwMTI
-            redirect_uri:
-              type: string
-              format: uri
-              example: https://example.com/callback
-            code:
-              type: string
-              example: abcdef1234567890
-          required: [client_id, client_secret, redirect_uri, code]
 
   responses:
     BadRequest:
@@ -757,6 +738,8 @@ components:
           example: "Alice Johnson"
         matched_calendar_invitee_email:
           type: string
+          description: |
+            **Coming soon!**
           format: email
           example: "alice.johnson@acme.com"
 
